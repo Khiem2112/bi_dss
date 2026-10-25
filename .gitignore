@@ -1,0 +1,38 @@
+# Moi truong va thong tin xac thuc nhay cam
+.env
+.env.*
+!.env.example
+*.env
+
+# dbt artifacts va logs
+etl/target/
+etl/logs/
+etl/.user.yml
+*.log
+
+# Du lieu cuc bo va DuckDB
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+dev_warehouse.duckdb
+data/
+
+# Frontend demo
+demo/node_modules/
+demo/dist/
+demo/*.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+.venv/
+.uv-cache/
+
+# Tai lieu va tap tin khong can commit cung code
+*.docx
+*.pdf
+*.xlsx
+exercises/
+images/
+progress/
+task/

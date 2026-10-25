@@ -1,0 +1,11 @@
+flights_etl:
+  target: prod
+  outputs:
+    dev:
+      type: duckdb
+      path: "dev_warehouse.duckdb"
+      threads: 4
+    prod:
+      type: duckdb
+      path: "md:my_db"
+      threads: 4

@@ -1,0 +1,25 @@
+name: 'flights_etl'
+version: '1.0.0'
+config-version: 2
+
+profile: 'flights_etl'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  flights_etl:
+    staging:
+      +materialized: view
+    dimensions:
+      +materialized: table
+    marts:
+      +materialized: table

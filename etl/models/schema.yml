@@ -1,0 +1,143 @@
+version: 2
+
+models:
+  - name: mart_base
+    description: "Bang tong hop grain min nhat cua Southwest Airlines (WN) giai doan 2015-2018"
+    columns:
+      - name: year_month
+        description: "Thang nam dinh dang YYYY-MM"
+        tests:
+          - not_null
+      - name: day_of_week
+        description: "Thu trong tuan tu 1 den 7"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7]
+      - name: time_block
+        description: "Khung gio ke hoach xuat phat"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Early Morning', 'Morning', 'Afternoon', 'Evening']
+      - name: origin
+        description: "Ma san bay xuat phat"
+        tests:
+          - not_null
+      - name: destination
+        description: "Ma san bay dich den"
+        tests:
+          - not_null
+      - name: distance_group
+        description: "Nhom cu ly tu G01 den G11"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['G01', 'G02', 'G03', 'G04', 'G05', 'G06', 'G07', 'G08', 'G09', 'G10', 'G11']
+      - name: season
+        description: "Mua trong nam"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Winter', 'Spring', 'Summer', 'Autumn']
+      - name: eligible_flights
+        description: "So chuyen bay du dieu kien"
+        tests:
+          - not_null
+      - name: delayed_flights
+        description: "So chuyen bay den tre tu 15 phut"
+        tests:
+          - not_null
+
+  - name: mart_delay_causes
+    description: "Bang tong hop 5 nguyen nhan tre cua Southwest Airlines (WN) 2015-2018"
+    columns:
+      - name: year_month
+        tests:
+          - not_null
+      - name: origin
+        tests:
+          - not_null
+      - name: destination
+        tests:
+          - not_null
+      - name: cause
+        description: "Loai nguyen nhan tre"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Carrier', 'Weather', 'NAS', 'Security', 'LateAircraft']
+      - name: affected_flights
+        tests:
+          - not_null
+      - name: delay_minutes
+        tests:
+          - not_null
+
+  - name: dim_date
+    description: "Bang chieu thoi gian 1.461 ngay tu 2015 den 2018"
+    columns:
+      - name: flight_date
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_carrier
+    description: "Bang chieu 19 hang hang khong noi dia My"
+    columns:
+      - name: carrier_code
+        tests:
+          - not_null
+          - unique
+      - name: carrier_name
+        tests:
+          - not_null
+
+  - name: dim_scheduled_time
+    description: "Bang chieu thoi gian khoi hanh du kien (DimScheduledTime)"
+    columns:
+      - name: scheduled_time_key
+        tests:
+          - not_null
+          - unique
+      - name: crs_dep_time
+        tests:
+          - not_null
+          - unique
+      - name: time_block
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Early Morning', 'Morning', 'Afternoon', 'Evening']
+
+  - name: dim_airport
+    description: "Bang chieu san bay noi dia My"
+    columns:
+      - name: airport_code
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_route
+    description: "Bang chieu tuyen bay co huong"
+    columns:
+      - name: origin
+        tests:
+          - not_null
+      - name: destination
+        tests:
+          - not_null
+
+  - name: dim_distance_group
+    description: "Bang chieu 11 nhom cu ly tieu chuan BTS"
+    columns:
+      - name: distance_group
+        tests:
+          - not_null
+          - unique
