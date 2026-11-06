@@ -16,8 +16,17 @@ all_airports AS (
 )
 
 SELECT
+    ROW_NUMBER() OVER (ORDER BY airport_code) AS airport_key,
     airport_code,
     airport_code AS airport_name
 FROM all_airports
 WHERE airport_code IS NOT NULL AND airport_code != ''
-ORDER BY airport_code
+
+UNION ALL
+
+SELECT
+    -1 AS airport_key,
+    'UNKNOWN' AS airport_code,
+    'Unknown Airport' AS airport_name
+
+ORDER BY airport_key

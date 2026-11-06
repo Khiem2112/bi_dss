@@ -1,7 +1,14 @@
 -- Bang chieu nhom cu ly theo tieu chuan BTS 250 dam
+-- Ranh gioi phai khop voi macro distance_group_expr() trong macros/business_rules.sql
 {{ config(materialized='table') }}
 
-SELECT * FROM (
+SELECT
+    ROW_NUMBER() OVER (ORDER BY min_distance) AS distance_group_key,
+    distance_group,
+    min_distance,
+    max_distance,
+    label_vi
+FROM (
     VALUES
         ('G01', 0, 249, '0–249 dặm'),
         ('G02', 250, 499, '250–499 dặm'),
@@ -15,3 +22,7 @@ SELECT * FROM (
         ('G10', 2250, 2499, '2.250–2.499 dặm'),
         ('G11', 2500, 99999, 'Từ 2.500 dặm')
 ) AS t(distance_group, min_distance, max_distance, label_vi)
+
+UNION ALL
+
+SELECT -1, 'UNKNOWN', NULL, NULL, 'Unknown Distance Group'

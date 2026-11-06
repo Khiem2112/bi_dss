@@ -1,10 +1,13 @@
 flights_etl:
-  target: prod
+  target: dev
   outputs:
     dev:
       type: duckdb
       path: "dev_warehouse.duckdb"
       threads: 4
+      settings:
+        memory_limit: '8GB'
+        preserve_insertion_order: false
     prod:
       type: duckdb
       path: "md:my_db"

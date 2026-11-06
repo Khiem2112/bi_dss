@@ -7,9 +7,11 @@ WITH date_spine AS (
 )
 
 SELECT
+    CAST(strftime(flight_date, '%Y%m%d') AS INTEGER) AS date_key,
     flight_date,
     EXTRACT(YEAR FROM flight_date)::INTEGER AS year,
     EXTRACT(MONTH FROM flight_date)::INTEGER AS month,
+    EXTRACT(QUARTER FROM flight_date)::INTEGER AS quarter,
     strftime(flight_date, '%Y-%m') AS year_month,
     EXTRACT(DAY FROM flight_date)::INTEGER AS day_of_month,
     isodow(flight_date) AS day_of_week,
@@ -22,12 +24,7 @@ SELECT
         WHEN 6 THEN 'Thứ Bảy'
         WHEN 7 THEN 'Chủ Nhật'
     END AS day_of_week_vi,
-    CASE
-        WHEN EXTRACT(MONTH FROM flight_date) IN (1, 2, 3) THEN 'Winter'
-        WHEN EXTRACT(MONTH FROM flight_date) IN (4, 5, 6) THEN 'Spring'
-        WHEN EXTRACT(MONTH FROM flight_date) IN (7, 8, 9) THEN 'Summer'
-        ELSE 'Autumn'
-    END AS season,
+    {{ season_expr('EXTRACT(MONTH FROM flight_date)') }} AS season,
     CASE
         WHEN EXTRACT(MONTH FROM flight_date) IN (1, 2, 3) THEN 'Mùa đông'
         WHEN EXTRACT(MONTH FROM flight_date) IN (4, 5, 6) THEN 'Mùa xuân'

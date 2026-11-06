@@ -11,7 +11,7 @@ WITH wn_delays AS (
         nas_delay,
         security_delay,
         late_aircraft_delay
-    FROM {{ ref('stg_flights') }}
+    FROM {{ ref('fact_flight') }}
     WHERE carrier = 'WN' AND is_delayed = 1
 ),
 

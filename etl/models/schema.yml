@@ -52,6 +52,104 @@ models:
         description: "So chuyen bay den tre tu 15 phut"
         tests:
           - not_null
+      - name: sample_size
+        description: "So chuyen du dieu kien dung sau ket qua cua segment (bang eligible_flights)"
+        tests:
+          - not_null
+      - name: sample_size_flag
+        description: "Trang thai du mau: Sufficient hoac Low Sample theo nguong tam thoi"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Sufficient', 'Low Sample']
+      - name: baseline_delay_rate
+        description: "Ty le tre tham chieu cua WN trong cung season + time_block"
+      - name: baseline_gap
+        description: "Chenh lech diem % giua delay_rate cua segment va baseline_delay_rate"
+      - name: average_arrival_delay
+        description: "Phut tre den trung binh tren tap chuyen du dieu kien (= arrival_delay_sum / eligible_flights)"
+
+  - name: fact_flight
+    description: "Fact o grain chuyen bay, noi voi dimension bang surrogate key (-1 = Unknown Member)"
+    columns:
+      - name: flight_key
+        description: "Khoa ky thuat duy nhat cua FactFlight"
+        tests:
+          - not_null
+          - unique
+      - name: carrier_key
+        tests:
+          - not_null
+      - name: origin_airport_key
+        tests:
+          - not_null
+      - name: destination_airport_key
+        tests:
+          - not_null
+      - name: route_key
+        tests:
+          - not_null
+      - name: distance_group_key
+        tests:
+          - not_null
+      - name: business_key_duplicate_flag
+        description: "True neu to hop 6 truong business key (date+carrier+flight_number+origin+dest+crs_dep_time) xuat hien nhieu hon 1 lan"
+        tests:
+          - not_null
+      - name: delay_outcome
+        description: "1 = tre, 0 = khong tre, NULL = khong xac dinh duoc ket qua den (thieu ARR_DELAY). Khac is_delayed (luon 0/1, dung de SUM KPI)."
+        tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+              config:
+                where: "delay_outcome IS NOT NULL"
+
+  - name: mart_carrier_benchmark
+    description: "So sanh WN voi hang tham chieu (DL, AA) tren cung route + time_block + thang"
+    columns:
+      - name: carrier
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['WN', 'DL', 'AA']
+      - name: sample_size_flag
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Sufficient', 'Low Sample']
+      - name: average_arrival_delay
+        description: "Phut tre den trung binh tren tap chuyen du dieu kien cua tung hang"
+      - name: baseline_delay_rate
+        description: "Ty le tre gop cua hang tham chieu (khac WN) cung route+time_block+thang. NULL o dong khong phai WN."
+      - name: baseline_gap
+        description: "delay_rate (dong WN) - baseline_delay_rate. NULL o dong khong phai WN."
+
+  - name: mart_model_features
+    description: "Feature mart cho DSS: dac trung pre-flight-safe + nhan delay_outcome, chia theo dataset_split (train/validation/test theo nam)"
+    columns:
+      - name: flight_key
+        tests:
+          - not_null
+          - unique
+      - name: dataset_split
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['train', 'validation', 'test']
+      - name: delay_outcome
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+
+  - name: dq_log
+    description: "Bang doi soat chat luong du lieu: so dong, undetermined outcome, trung khoa, khoa chua map duoc"
 
   - name: mart_delay_causes
     description: "Bang tong hop 5 nguyen nhan tre cua Southwest Airlines (WN) 2015-2018"
@@ -106,19 +204,26 @@ models:
           - not_null
           - unique
       - name: crs_dep_time
+        description: "NULL cho dong Unknown Member (scheduled_time_key = -1)"
         tests:
-          - not_null
           - unique
+          - not_null:
+              config:
+                where: "scheduled_time_key != -1"
       - name: time_block
         tests:
           - not_null
           - accepted_values:
               arguments:
-                values: ['Early Morning', 'Morning', 'Afternoon', 'Evening']
+                values: ['Early Morning', 'Morning', 'Afternoon', 'Evening', 'Unknown']
 
   - name: dim_airport
     description: "Bang chieu san bay noi dia My"
     columns:
+      - name: airport_key
+        tests:
+          - not_null
+          - unique
       - name: airport_code
         tests:
           - not_null
@@ -127,6 +232,10 @@ models:
   - name: dim_route
     description: "Bang chieu tuyen bay co huong"
     columns:
+      - name: route_key
+        tests:
+          - not_null
+          - unique
       - name: origin
         tests:
           - not_null
@@ -137,6 +246,10 @@ models:
   - name: dim_distance_group
     description: "Bang chieu 11 nhom cu ly tieu chuan BTS"
     columns:
+      - name: distance_group_key
+        tests:
+          - not_null
+          - unique
       - name: distance_group
         tests:
           - not_null
