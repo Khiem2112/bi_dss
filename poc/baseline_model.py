@@ -18,7 +18,9 @@ Tieu chi POC (theo Bang 3.5 / SC6 / SC7):
 Khong dung lam ket luan cuoi cung cho Phase 8 full build - day chi la POC de xac nhan
 huong tiep can kha thi truoc khi dau tu day du.
 """
+import os
 import duckdb
+import joblib
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -31,8 +33,25 @@ from sklearn.metrics import roc_auc_score, brier_score_loss
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from dotenv import load_dotenv
 
-DB_PATH = "../etl/dev_warehouse.duckdb"
+# Tim va doc file .env de lay cau hinh ket noi MotherDuck
+for env_path in [".env", "../.env", "../etl/.env", "etl/.env"]:
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        break
+
+# Cau hinh ket noi MotherDuck (my_db)
+MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN")
+MOTHERDUCK_CONN = os.getenv("MOTHERDUCK_CONNECTION_STRING")
+
+if MOTHERDUCK_CONN:
+    DB_PATH = MOTHERDUCK_CONN
+elif MOTHERDUCK_TOKEN:
+    DB_PATH = f"md:my_db?motherduck_token={MOTHERDUCK_TOKEN}"
+else:
+    DB_PATH = os.getenv("DUCKDB_PATH", "md:my_db")
+
 OUTPUT_DIR = "output"
 
 # Predictor hang muc thap, pre-flight-safe, tranh high-cardinality (origin/destination/route)
@@ -74,6 +93,9 @@ def evaluate(y_true, y_pred_proba, label):
 
 
 def main():
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    db_display = DB_PATH.split("?")[0]
+    print(f"Dang ket noi den co so du lieu: {db_display}...")
     con = duckdb.connect(DB_PATH, read_only=True)
 
     print("Dang doc du lieu tu mart_model_features...")
@@ -151,6 +173,11 @@ def main():
     results_path = f"{OUTPUT_DIR}/poc_model_results.csv"
     results.to_csv(results_path, index=False)
     print(f"Da luu bang ket qua: {results_path}")
+
+    # Xuat pipeline model gom bo tien xu ly va mo hinh Logistic Regression ra file joblib
+    model_save_path = f"{OUTPUT_DIR}/baseline_model.joblib"
+    joblib.dump(pipeline, model_save_path)
+    print(f"Da luu model pipeline vao file: {model_save_path}")
 
 
 if __name__ == "__main__":
