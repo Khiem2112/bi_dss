@@ -1,0 +1,5 @@
+model,split,roc_auc,brier,n
+Baseline (constant),validation,0.5,0.1609046264401056,1308989
+LogisticRegression,validation,0.6495091885977333,0.15338692796570175,1308989
+Baseline (constant),test,0.5,0.15739556361986912,1331609
+LogisticRegression,test,0.6572246772231621,0.14947556280138952,1331609

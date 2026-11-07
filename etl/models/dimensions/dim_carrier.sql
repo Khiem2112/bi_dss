@@ -38,4 +38,13 @@ SELECT
         ELSE 'Hãng đối thủ khác'
     END AS carrier_role_vi
 FROM carriers
-ORDER BY carrier_code
+
+UNION ALL
+
+SELECT
+    -1 AS carrier_key,
+    'UNKNOWN' AS carrier_code,
+    'Unknown Carrier' AS carrier_name,
+    'Không xác định' AS carrier_role_vi
+
+ORDER BY carrier_key

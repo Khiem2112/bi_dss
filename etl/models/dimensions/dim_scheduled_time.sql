@@ -13,18 +13,7 @@ SELECT
     LPAD((crs_dep_time // 100)::VARCHAR, 2, '0') || ':' || LPAD((crs_dep_time % 100)::VARCHAR, 2, '0') AS scheduled_departure_time,
     (crs_dep_time // 100)::INTEGER AS departure_hour,
     (crs_dep_time % 100)::INTEGER AS departure_minute,
-    CASE
-        WHEN crs_dep_time < 600 THEN 'Early Morning'
-        WHEN crs_dep_time < 1200 THEN 'Morning'
-        WHEN crs_dep_time < 1800 THEN 'Afternoon'
-        ELSE 'Evening'
-    END AS departure_time_block,
-    CASE
-        WHEN crs_dep_time < 600 THEN 'Early Morning'
-        WHEN crs_dep_time < 1200 THEN 'Morning'
-        WHEN crs_dep_time < 1800 THEN 'Afternoon'
-        ELSE 'Evening'
-    END AS time_block,
+    {{ time_block_expr('crs_dep_time') }} AS time_block,
     CASE
         WHEN crs_dep_time < 600 THEN 'Sáng sớm'
         WHEN crs_dep_time < 1200 THEN 'Buổi sáng'
@@ -32,4 +21,9 @@ SELECT
         ELSE 'Buổi tối'
     END AS time_block_vi
 FROM distinct_times
-ORDER BY crs_dep_time
+
+UNION ALL
+
+SELECT -1, NULL, 'Unknown', NULL, NULL, 'Unknown', 'Không xác định'
+
+ORDER BY scheduled_time_key
