@@ -193,7 +193,7 @@ td.mono{font-variant-numeric:tabular-nums}
     <div class="kpis">
       <div class="kpi"><div class="label">Eligible Flights</div><div class="value" id="kpi-eligible">—</div><div class="sub">tổng chuyến bay hợp lệ trong phạm vi lọc</div></div>
       <div class="kpi"><div class="label">Delay Rate (%)</div><div class="value" id="kpi-rate">—</div><div class="sub"><span id="kpi-rate-sub"></span></div></div>
-      <div class="kpi"><div class="label">Avg Arrival Delay</div><div class="value" id="kpi-avgdelay">—</div><div class="sub">phút / chuyến (trên tổng chuyến đến trễ)</div></div>
+      <div class="kpi"><div class="label">Avg Arrival Delay</div><div class="value" id="kpi-avgdelay">—</div><div class="sub">phút / chuyến (trên tổng chuyến đủ điều kiện)</div></div>
     </div>
 
     <div class="card" style="position:relative">
@@ -366,7 +366,7 @@ td.mono{font-variant-numeric:tabular-nums}
       var v = byMonth[m];
       return { month:m, eligible:v.eligible, delayed:v.delayed,
         rate: v.eligible ? v.delayed/v.eligible*100 : 0,
-        avgdelay: v.delayed ? v.arrdelaysum/v.delayed : 0,
+        avgdelay: v.eligible ? v.arrdelaysum/v.eligible : 0,
         baseline: v.eligible ? v.baseW/v.eligible : 0 };
     });
 
@@ -374,7 +374,7 @@ td.mono{font-variant-numeric:tabular-nums}
     var totalDelayed = series.reduce(function(a,b){return a+b.delayed;},0);
     var totalArrDelaySum = rows.reduce(function(a,b){return a+b.arrival_delay_sum;},0);
     var rate = totalEligible ? totalDelayed/totalEligible*100 : 0;
-    var avgDelay = totalDelayed ? totalArrDelaySum/totalDelayed : 0;
+    var avgDelay = totalEligible ? totalArrDelaySum/totalEligible : 0;
     var baselineAvg = totalEligible ? rows.reduce(function(a,b){return a+b.baseline_delay_rate*b.eligible_flights;},0)/totalEligible : 0;
 
     document.getElementById("kpi-eligible").textContent = fmt(totalEligible);
@@ -450,15 +450,39 @@ td.mono{font-variant-numeric:tabular-nums}
   function filteredRoutes(){
     var s = state.p2;
     var q = s.search;
-    return ROUTES.filter(function(r){
+    var rows = ROUTES.filter(function(r){
+      if (s.season.size && !s.season.has(r.season)) return false;
       if (s.timeblock.size && !s.timeblock.has(r.time_block)) return false;
-      if (s.flag.size && !s.flag.has(r.sample_size_flag)) return false;
       if (q){
         var hay = (r.origin + "-" + r.destination);
         if (hay.indexOf(q) === -1 && r.origin.indexOf(q)===-1 && r.destination.indexOf(q)===-1) return false;
       }
       return true;
     });
+
+    // re-aggregate across season (grain below route x time_block x season) so
+    // delay rate / baseline gap are recomputed at the currently selected scope,
+    // never averaged across the season rows that got summed together
+    var byKey = {};
+    rows.forEach(function(r){
+      var key = r.origin + "|" + r.destination + "|" + r.time_block;
+      var g = byKey[key] || (byKey[key] = { origin:r.origin, destination:r.destination, time_block:r.time_block, eligible_flights:0, delayed_flights:0, baseW:0 });
+      g.eligible_flights += r.eligible_flights;
+      g.delayed_flights += r.delayed_flights;
+      g.baseW += r.baseline_delay_rate * r.eligible_flights;
+    });
+    var agg = Object.keys(byKey).map(function(k){
+      var g = byKey[k];
+      g.delay_rate = g.eligible_flights ? g.delayed_flights/g.eligible_flights*100 : 0;
+      g.baseline_delay_rate = g.eligible_flights ? g.baseW/g.eligible_flights : 0;
+      g.baseline_gap = g.delay_rate - g.baseline_delay_rate;
+      g.sample_size_flag = g.eligible_flights >= 30 ? "Sufficient" : "Low Sample";
+      return g;
+    });
+
+    // sample-size flag is a property of the aggregated scope, so it filters after aggregation
+    if (s.flag.size) agg = agg.filter(function(r){ return s.flag.has(r.sample_size_flag); });
+    return agg;
   }
 
   function renderPage2(){
