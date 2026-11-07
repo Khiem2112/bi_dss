@@ -1,0 +1,505 @@
+<title>WN Delay Hotspot POC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: sticky top nav + filter bar, content area scrolls; page 2 matrix is a sortable/searchable table (route cardinality too high for a literal grid) */
+:root{
+  --bg:#f9f9f7; --surface:#fcfcfb; --surface-2:#f1f0ec;
+  --ink:#0b0b0b; --ink-2:#52514e; --ink-muted:#898781;
+  --line:#e1e0d9; --border:rgba(11,11,11,0.10);
+  --accent:#2a78d6; --accent-ink:#ffffff;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --div-pos:#d03b3b; --div-neg:#2a78d6; --div-mid:#f0efec;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+    --ink:#f0efec; --ink-2:#c3c2b7; --ink-muted:#898781;
+    --line:#2c2c2a; --border:rgba(255,255,255,0.10);
+    --accent:#3987e5; --accent-ink:#ffffff;
+    --good:#0ca30c; --warn:#fab219; --crit:#e66767;
+    --div-pos:#e66767; --div-neg:#3987e5; --div-mid:#383835;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+  --ink:#f0efec; --ink-2:#c3c2b7; --ink-muted:#898781;
+  --line:#2c2c2a; --border:rgba(255,255,255,0.10);
+  --accent:#3987e5; --accent-ink:#ffffff;
+  --good:#0ca30c; --warn:#fab219; --crit:#e66767;
+  --div-pos:#e66767; --div-neg:#3987e5; --div-mid:#383835;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+  padding-bottom: 32px;
+}
+h1,h2,h3{text-wrap:balance; margin:0}
+.wrap{max-width:1100px; margin:0 auto}
+
+/* top bar */
+.topbar{
+  position: sticky; top: env(safe-area-inset-top,0px); z-index: 10;
+  background: var(--surface); border-bottom:1px solid var(--line);
+  margin: 0 calc(-1*max(16px, env(safe-area-inset-left,0px))) 0 calc(-1*max(16px, env(safe-area-inset-right,0px)));
+  padding: 12px max(16px, env(safe-area-inset-left,0px)) 10px max(16px, env(safe-area-inset-right,0px));
+}
+.topbar-inner{max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+.brand{font-weight:700; font-size:15px; letter-spacing:.2px; white-space:nowrap}
+.brand small{display:block; font-weight:400; color:var(--ink-muted); font-size:11px}
+.tabs{display:flex; gap:4px; background:var(--surface-2); padding:3px; border-radius:10px}
+.tab{
+  border:0; background:transparent; color:var(--ink-2); font-size:13px; font-weight:600;
+  padding:7px 14px; border-radius:8px; cursor:pointer; font-family:inherit;
+}
+.tab.active{background:var(--accent); color:var(--accent-ink)}
+.tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+main{max-width:1100px; margin:0 auto; padding-top:20px}
+section.page{display:none}
+section.page.active{display:block}
+
+.subhead{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px}
+.subhead h2{font-size:20px}
+.subhead p{color:var(--ink-2); font-size:13px; margin:2px 0 0}
+
+/* filter bar */
+.filterbar{
+  display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:14px 16px; margin-bottom:18px;
+}
+.filtergroup{display:flex; flex-direction:column; gap:6px; min-width:0}
+.filtergroup label.grouplabel{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ink-muted)}
+.chipset{display:flex; gap:6px; flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line); background:var(--surface-2); color:var(--ink-2);
+  font-size:12px; font-weight:600; padding:6px 11px; border-radius:999px; cursor:pointer; font-family:inherit;
+  user-select:none;
+}
+.chip[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.chip:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.searchbox{
+  border:1px solid var(--line); background:var(--surface-2); color:var(--ink);
+  font-size:13px; padding:7px 10px; border-radius:8px; font-family:inherit; min-width:160px;
+}
+.searchbox:focus-visible{outline:2px solid var(--accent)}
+
+/* KPI cards */
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:20px}
+.kpi{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px;
+}
+.kpi .label{font-size:12px; color:var(--ink-muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px}
+.kpi .value{font-size:28px; font-weight:700; margin-top:6px; font-variant-numeric:tabular-nums}
+.kpi .sub{font-size:12px; color:var(--ink-2); margin-top:4px}
+
+/* chart card */
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:20px}
+.card h3{font-size:14px; margin-bottom:2px}
+.card .desc{font-size:12px; color:var(--ink-muted); margin-bottom:14px}
+svg{display:block; width:100%; height:auto; overflow:visible}
+.gridline{stroke:var(--line)}
+.axislabel{fill:var(--ink-muted); font-size:10px}
+.lineseries{fill:none; stroke:var(--accent); stroke-width:2}
+.dot{fill:var(--accent)}
+.dot-hit{fill:transparent; cursor:pointer}
+.crosshair{stroke:var(--ink-muted); stroke-width:1; stroke-dasharray:3 3}
+#tooltip{
+  position:absolute; pointer-events:none; background:var(--ink); color:var(--surface);
+  font-size:12px; padding:6px 9px; border-radius:7px; transform:translate(-50%,-115%);
+  white-space:nowrap; opacity:0; transition:opacity .08s; z-index:20; font-variant-numeric:tabular-nums;
+}
+:root[data-theme="dark"] #tooltip, @media (prefers-color-scheme:dark){ #tooltip{ } }
+
+/* table */
+.tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px}
+table{width:100%; border-collapse:collapse; font-size:13px; min-width:640px}
+thead th{
+  position:sticky; top:0; background:var(--surface-2); text-align:left; font-size:11px;
+  text-transform:uppercase; letter-spacing:.4px; color:var(--ink-muted); font-weight:700;
+  padding:9px 10px; border-bottom:1px solid var(--line); cursor:pointer; white-space:nowrap;
+}
+thead th.num, td.num{text-align:right; font-variant-numeric:tabular-nums}
+thead th .arrow{opacity:.4; margin-left:3px}
+thead th.sort-active .arrow{opacity:1; color:var(--accent)}
+tbody tr{border-bottom:1px solid var(--line)}
+tbody tr:last-child{border-bottom:0}
+tbody tr:hover{background:var(--surface-2)}
+td{padding:8px 10px; color:var(--ink)}
+td.mono{font-variant-numeric:tabular-nums}
+.gapcell{display:flex; align-items:center; gap:8px; justify-content:flex-end}
+.gapbar{height:8px; border-radius:3px; min-width:2px}
+.flag{
+  display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700;
+  padding:2px 8px; border-radius:999px;
+}
+.flag.suff{background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good)}
+.flag.low{background:color-mix(in srgb, var(--ink-muted) 20%, transparent); color:var(--ink-2)}
+.flag::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor}
+.tablefoot{display:flex; justify-content:space-between; align-items:center; padding:9px 12px; font-size:12px; color:var(--ink-muted); flex-wrap:wrap; gap:8px}
+.topnbtn{border:1px solid var(--line); background:var(--surface-2); color:var(--ink-2); font-size:12px; font-weight:600; padding:5px 10px; border-radius:7px; cursor:pointer; font-family:inherit}
+.topnbtn[aria-pressed="true"]{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+
+.scenario{
+  background:var(--surface-2); border:1px dashed var(--line); border-radius:12px; padding:14px 16px;
+  font-size:13px; color:var(--ink-2); margin-top:16px; line-height:1.5;
+}
+.scenario b{color:var(--ink)}
+.empty{padding:28px; text-align:center; color:var(--ink-muted); font-size:13px}
+
+@media (max-width:600px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpi .value{font-size:22px}
+}
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">WN Delay Hotspot POC<small>mart_base &middot; 2018</small></div>
+    <div class="tabs" role="tablist" aria-label="Pages">
+      <button class="tab active" data-page="p1" role="tab" aria-selected="true">Tổng quan mạng lưới</button>
+      <button class="tab" data-page="p2" role="tab" aria-selected="false">Hotspot Route × Time Block</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <!-- PAGE 1 -->
+  <section class="page active" id="p1">
+    <div class="subhead">
+      <div>
+        <h2>Tổng quan mạng lưới WN (2018)</h2>
+        <p>BQ-01 — xu hướng tỷ lệ trễ theo thời gian, lọc theo mùa và khung giờ</p>
+      </div>
+    </div>
+
+    <div class="filterbar">
+      <div class="filtergroup">
+        <label class="grouplabel">Season</label>
+        <div class="chipset" id="p1-season"></div>
+      </div>
+      <div class="filtergroup">
+        <label class="grouplabel">Time block</label>
+        <div class="chipset" id="p1-timeblock"></div>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="label">Eligible Flights</div><div class="value" id="kpi-eligible">—</div><div class="sub">tổng chuyến bay hợp lệ trong phạm vi lọc</div></div>
+      <div class="kpi"><div class="label">Delay Rate (%)</div><div class="value" id="kpi-rate">—</div><div class="sub"><span id="kpi-rate-sub"></span></div></div>
+      <div class="kpi"><div class="label">Avg Arrival Delay</div><div class="value" id="kpi-avgdelay">—</div><div class="sub">phút / chuyến (trên tổng chuyến đến trễ)</div></div>
+    </div>
+
+    <div class="card" style="position:relative">
+      <h3>Delay Rate (%) theo tháng — 2018</h3>
+      <div class="desc">Trục X: year_month &middot; Trục Y: Delayed Flights / Eligible Flights × 100, tính lại theo đúng filter hiện tại (non‑additive measure)</div>
+      <svg id="linechart" viewBox="0 0 860 300" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="tooltip"></div>
+    </div>
+  </section>
+
+  <!-- PAGE 2 -->
+  <section class="page" id="p2">
+    <div class="subhead">
+      <div>
+        <h2>Hotspot Route × Time Block</h2>
+        <p>BQ-02 — route/khung giờ lệch khỏi baseline &middot; BQ-06 — kiểm tra cỡ mẫu trước khi kết luận</p>
+      </div>
+    </div>
+
+    <div class="filterbar">
+      <div class="filtergroup">
+        <label class="grouplabel">Season</label>
+        <div class="chipset" id="p2-season"></div>
+      </div>
+      <div class="filtergroup">
+        <label class="grouplabel">Time block</label>
+        <div class="chipset" id="p2-timeblock"></div>
+      </div>
+      <div class="filtergroup">
+        <label class="grouplabel">Sample size</label>
+        <div class="chipset" id="p2-flag"></div>
+      </div>
+      <div class="filtergroup" style="flex:1 1 160px">
+        <label class="grouplabel" for="routesearch">Tìm route</label>
+        <input id="routesearch" class="searchbox" type="text" placeholder="vd. ORD hoặc ORD-DFW">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Bảng Baseline Gap theo route × time block</h3>
+      <div class="desc">Baseline Gap = Delay Rate (%) − Baseline Delay Rate, tính lại từ SUM(delayed)/SUM(eligible) tại filter hiện tại. Đỏ = tệ hơn baseline, xanh = tốt hơn baseline. Nhấn tiêu đề cột để sắp xếp.</div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th data-key="origin">Origin<span class="arrow">↕</span></th>
+            <th data-key="destination">Destination<span class="arrow">↕</span></th>
+            <th data-key="time_block">Time block<span class="arrow">↕</span></th>
+            <th class="num" data-key="eligible_flights">Eligible<span class="arrow">↕</span></th>
+            <th class="num" data-key="delay_rate">Delay Rate %<span class="arrow">↕</span></th>
+            <th class="num" data-key="baseline_delay_rate">Baseline %<span class="arrow">↕</span></th>
+            <th class="num" data-key="baseline_gap">Baseline Gap<span class="arrow sort-active">↓</span></th>
+            <th data-key="sample_size_flag">Sample<span class="arrow">↕</span></th>
+          </tr></thead>
+          <tbody id="routetbody"></tbody>
+        </table>
+      </div>
+      <div class="tablefoot">
+        <span id="rowcount"></span>
+        <div style="display:flex; gap:6px">
+          <button class="topnbtn" data-n="50" aria-pressed="true">Top 50</button>
+          <button class="topnbtn" data-n="200">Top 200</button>
+          <button class="topnbtn" data-n="999999">Tất cả</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="scenario">
+      <b>Kịch bản kiểm tra nhanh (mục 8.4):</b> tìm 1 route có Baseline Gap dương cao nhất và Sample Size = Sufficient, trong khung giờ Evening — chọn chip <b>Evening</b>, chip <b>Sufficient</b>, bảng tự sắp theo Baseline Gap giảm dần → đọc dòng đầu tiên. 2 thao tác.
+    </div>
+  </section>
+</main>
+
+<script src="dashboard_data.js"></script>
+<script>
+(function(){
+  "use strict";
+  var state = {
+    p1: { season: new Set(), timeblock: new Set() },
+    p2: { season: new Set(), timeblock: new Set(), flag: new Set(["Sufficient"]), search: "", sortKey: "baseline_gap", sortDir: -1, topn: 50 }
+  };
+
+  // ---------- tabs ----------
+  document.querySelectorAll(".tab").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll(".tab").forEach(function(b){ b.classList.remove("active"); b.setAttribute("aria-selected","false"); });
+      btn.classList.add("active"); btn.setAttribute("aria-selected","true");
+      document.querySelectorAll("section.page").forEach(function(s){ s.classList.remove("active"); });
+      document.getElementById(btn.dataset.page).classList.add("active");
+    });
+  });
+
+  // ---------- chip builder ----------
+  function buildChips(container, values, selectedSet, onChange){
+    container.innerHTML = "";
+    values.forEach(function(v){
+      var chip = document.createElement("button");
+      chip.className = "chip"; chip.type = "button"; chip.textContent = v;
+      chip.setAttribute("aria-pressed", selectedSet.has(v) ? "true" : "false");
+      chip.addEventListener("click", function(){
+        if (selectedSet.has(v)) selectedSet.delete(v); else selectedSet.add(v);
+        chip.setAttribute("aria-pressed", selectedSet.has(v) ? "true" : "false");
+        onChange();
+      });
+      container.appendChild(chip);
+    });
+  }
+
+  var SEASONS = ["Winter","Spring","Summer","Autumn"];
+  var TIMEBLOCKS = ["Early Morning","Morning","Afternoon","Evening"];
+
+  buildChips(document.getElementById("p1-season"), SEASONS, state.p1.season, renderPage1);
+  buildChips(document.getElementById("p1-timeblock"), TIMEBLOCKS, state.p1.timeblock, renderPage1);
+  buildChips(document.getElementById("p2-season"), SEASONS, state.p2.season, renderPage2);
+  buildChips(document.getElementById("p2-timeblock"), TIMEBLOCKS, state.p2.timeblock, renderPage2);
+  buildChips(document.getElementById("p2-flag"), ["Sufficient","Low Sample"], state.p2.flag, renderPage2);
+
+  document.getElementById("routesearch").addEventListener("input", function(e){
+    state.p2.search = e.target.value.trim().toUpperCase();
+    renderPage2();
+  });
+
+  document.querySelectorAll(".topnbtn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll(".topnbtn").forEach(function(b){ b.setAttribute("aria-pressed","false"); });
+      btn.setAttribute("aria-pressed","true");
+      state.p2.topn = parseInt(btn.dataset.n, 10);
+      renderPage2();
+    });
+  });
+
+  document.querySelectorAll("thead th[data-key]").forEach(function(th){
+    th.addEventListener("click", function(){
+      var key = th.dataset.key;
+      if (state.p2.sortKey === key) state.p2.sortDir *= -1;
+      else { state.p2.sortKey = key; state.p2.sortDir = -1; }
+      document.querySelectorAll("thead th").forEach(function(t){
+        t.classList.remove("sort-active");
+        t.querySelector(".arrow").textContent = "↕";
+      });
+      th.classList.add("sort-active");
+      th.querySelector(".arrow").textContent = state.p2.sortDir === -1 ? "↓" : "↑";
+      renderPage2();
+    });
+  });
+
+  // ---------- page 1 ----------
+  function fmt(n, d){
+    if (n === null || n === undefined || isNaN(n)) return "—";
+    return n.toLocaleString("en-US", { minimumFractionDigits: d||0, maximumFractionDigits: d||0 });
+  }
+
+  function filteredMonthly(){
+    return MONTHLY.filter(function(r){
+      var okS = state.p1.season.size === 0 || state.p1.season.has(r.season);
+      var okT = state.p1.timeblock.size === 0 || state.p1.timeblock.has(r.time_block);
+      return okS && okT;
+    });
+  }
+
+  function renderPage1(){
+    var rows = filteredMonthly();
+    var byMonth = {};
+    rows.forEach(function(r){
+      var m = byMonth[r.year_month] || (byMonth[r.year_month] = { eligible:0, delayed:0, arrdelaysum:0, baseW:0 });
+      m.eligible += r.eligible_flights; m.delayed += r.delayed_flights; m.arrdelaysum += r.arrival_delay_sum;
+      m.baseW += r.baseline_delay_rate * r.eligible_flights;
+    });
+    var months = Object.keys(byMonth).sort();
+    var series = months.map(function(m){
+      var v = byMonth[m];
+      return { month:m, eligible:v.eligible, delayed:v.delayed,
+        rate: v.eligible ? v.delayed/v.eligible*100 : 0,
+        avgdelay: v.delayed ? v.arrdelaysum/v.delayed : 0,
+        baseline: v.eligible ? v.baseW/v.eligible : 0 };
+    });
+
+    var totalEligible = series.reduce(function(a,b){return a+b.eligible;},0);
+    var totalDelayed = series.reduce(function(a,b){return a+b.delayed;},0);
+    var totalArrDelaySum = rows.reduce(function(a,b){return a+b.arrival_delay_sum;},0);
+    var rate = totalEligible ? totalDelayed/totalEligible*100 : 0;
+    var avgDelay = totalDelayed ? totalArrDelaySum/totalDelayed : 0;
+    var baselineAvg = totalEligible ? rows.reduce(function(a,b){return a+b.baseline_delay_rate*b.eligible_flights;},0)/totalEligible : 0;
+
+    document.getElementById("kpi-eligible").textContent = fmt(totalEligible);
+    document.getElementById("kpi-rate").textContent = fmt(rate,1) + "%";
+    document.getElementById("kpi-rate-sub").textContent = "Baseline " + fmt(baselineAvg,1) + "% · gap " + (rate-baselineAvg>=0?"+":"") + fmt(rate-baselineAvg,1) + " pts";
+    document.getElementById("kpi-avgdelay").textContent = fmt(avgDelay,1) + " phút";
+
+    drawLineChart(series);
+  }
+
+  function drawLineChart(series){
+    var svg = document.getElementById("linechart");
+    var W = 860, H = 300, padL = 44, padR = 16, padT = 16, padB = 34;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    svg.innerHTML = "";
+    if (!series.length){
+      svg.innerHTML = '<text x="'+(W/2)+'" y="'+(H/2)+'" text-anchor="middle" class="axislabel" font-size="13">Không có dữ liệu cho bộ lọc hiện tại</text>';
+      return;
+    }
+    var maxRate = Math.max.apply(null, series.map(function(s){return s.rate;})) * 1.15;
+    maxRate = Math.max(maxRate, 5);
+    var ns = "http://www.w3.org/2000/svg";
+    function el(tag, attrs){
+      var e = document.createElementNS(ns, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+    var x = function(i){ return padL + (series.length===1 ? plotW/2 : i/(series.length-1)*plotW); };
+    var y = function(v){ return padT + plotH - (v/maxRate)*plotH; };
+
+    // gridlines + y labels
+    var ticks = 4;
+    for (var t=0; t<=ticks; t++){
+      var val = maxRate/ticks*t;
+      var yy = y(val);
+      svg.appendChild(el("line", {x1:padL, x2:W-padR, y1:yy, y2:yy, class:"gridline"}));
+      var lbl = el("text", {x:padL-8, y:yy+3, "text-anchor":"end", class:"axislabel"});
+      lbl.textContent = val.toFixed(0) + "%";
+      svg.appendChild(lbl);
+    }
+    // x labels
+    series.forEach(function(s,i){
+      if (series.length > 8 && i % 2 !== 0 && i !== series.length-1) return;
+      var lbl = el("text", {x:x(i), y:H-10, "text-anchor":"middle", class:"axislabel"});
+      lbl.textContent = s.month.slice(5);
+      svg.appendChild(lbl);
+    });
+
+    // line path
+    var d = series.map(function(s,i){ return (i===0?"M":"L") + x(i).toFixed(1) + "," + y(s.rate).toFixed(1); }).join(" ");
+    svg.appendChild(el("path", {d:d, class:"lineseries"}));
+
+    var tooltip = document.getElementById("tooltip");
+    var card = svg.closest(".card");
+
+    series.forEach(function(s,i){
+      svg.appendChild(el("circle", {cx:x(i), cy:y(s.rate), r:4, class:"dot"}));
+      var hit = el("circle", {cx:x(i), cy:y(s.rate), r:14, class:"dot-hit"});
+      hit.addEventListener("mouseenter", function(){
+        tooltip.innerHTML = "<b>"+s.month+"</b><br>Delay rate: "+s.rate.toFixed(1)+"%<br>Baseline: "+s.baseline.toFixed(1)+"%<br>Eligible: "+fmt(s.eligible);
+        tooltip.style.opacity = 1;
+        var rect = svg.getBoundingClientRect(), crect = card.getBoundingClientRect();
+        var px = rect.left - crect.left + (x(i)/W)*rect.width;
+        var py = rect.top - crect.top + (y(s.rate)/H)*rect.height;
+        tooltip.style.left = px + "px"; tooltip.style.top = py + "px";
+      });
+      hit.addEventListener("mouseleave", function(){ tooltip.style.opacity = 0; });
+      svg.appendChild(hit);
+    });
+  }
+
+  // ---------- page 2 ----------
+  function filteredRoutes(){
+    var s = state.p2;
+    var q = s.search;
+    return ROUTES.filter(function(r){
+      if (s.timeblock.size && !s.timeblock.has(r.time_block)) return false;
+      if (s.flag.size && !s.flag.has(r.sample_size_flag)) return false;
+      if (q){
+        var hay = (r.origin + "-" + r.destination);
+        if (hay.indexOf(q) === -1 && r.origin.indexOf(q)===-1 && r.destination.indexOf(q)===-1) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderPage2(){
+    var rows = filteredRoutes();
+    var key = state.p2.sortKey, dir = state.p2.sortDir;
+    rows = rows.slice().sort(function(a,b){
+      var av = a[key], bv = b[key];
+      if (typeof av === "string") return dir * av.localeCompare(bv);
+      return dir * ((av||0) - (bv||0));
+    });
+    var total = rows.length;
+    rows = rows.slice(0, state.p2.topn);
+
+    var gaps = rows.map(function(r){return r.baseline_gap;});
+    var maxAbsGap = Math.max(1, Math.max.apply(null, gaps.map(Math.abs)));
+
+    var tbody = document.getElementById("routetbody");
+    if (!rows.length){
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">Không có route nào khớp bộ lọc hiện tại</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(function(r){
+        var pct = Math.min(100, Math.abs(r.baseline_gap)/maxAbsGap*100);
+        var color = r.baseline_gap >= 0 ? "var(--div-pos)" : "var(--div-neg)";
+        var flagClass = r.sample_size_flag === "Sufficient" ? "suff" : "low";
+        return "<tr>" +
+          "<td>"+r.origin+"</td>" +
+          "<td>"+r.destination+"</td>" +
+          "<td>"+r.time_block+"</td>" +
+          "<td class=\"num mono\">"+fmt(r.eligible_flights)+"</td>" +
+          "<td class=\"num mono\">"+fmt(r.delay_rate,1)+"</td>" +
+          "<td class=\"num mono\">"+fmt(r.baseline_delay_rate,1)+"</td>" +
+          "<td class=\"num mono\"><div class=\"gapcell\"><span>"+(r.baseline_gap>=0?"+":"")+fmt(r.baseline_gap,1)+"</span>" +
+            "<span class=\"gapbar\" style=\"width:"+Math.max(4,pct*0.4).toFixed(0)+"px; background:"+color+"\"></span></div></td>" +
+          "<td><span class=\"flag "+flagClass+"\">"+r.sample_size_flag+"</span></td>" +
+        "</tr>";
+      }).join("");
+    }
+    document.getElementById("rowcount").textContent = "Hiển thị " + rows.length.toLocaleString() + " / " + total.toLocaleString() + " route×time_block (2018)";
+  }
+
+  renderPage1();
+  renderPage2();
+})();
+</script>
