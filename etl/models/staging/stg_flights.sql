@@ -39,19 +39,12 @@ SELECT
     {{ distance_group_expr('DISTANCE') }} AS distance_group,
     
     CASE
-        WHEN COALESCE(CANCELLED, 0) = 0
-         AND COALESCE(DIVERTED, 0) = 0
-         AND ARR_DELAY IS NOT NULL
-        THEN 1
+        WHEN ARR_DELAY IS NOT NULL THEN 1
         ELSE 0
     END AS is_eligible,
     
     CASE
-        WHEN COALESCE(CANCELLED, 0) = 0
-         AND COALESCE(DIVERTED, 0) = 0
-         AND ARR_DELAY IS NOT NULL
-         AND ARR_DELAY >= 15
-        THEN 1
+        WHEN ARR_DELAY >= 15 THEN 1
         ELSE 0
     END AS is_delayed,
 
